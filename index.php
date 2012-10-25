@@ -14,6 +14,7 @@ new iFavorites;
 class iFavorites {
 	protected $slug = 'app';
 	protected $archive_slug = 'apps';
+	protected $app_data = array();
 
 	function __construct()
 	{
@@ -99,8 +100,51 @@ class iFavorites {
 		if ($_POST['post_type'] != $this->slug) return $post_id;
 		if (!current_user_can('edit_post', $post_id)) return $post_id;
 
-		if ($meta = $_POST['ifavorites']) {
-			update_post_meta($post_id, '_app_id', trim($meta['app_id']));
+		if ($form = $_POST['ifavorites']) {
+			$app_id = trim($form['app_id']);
+
+			$meta = get_post_custom($post_id);
+
+			if ($app_id != $meta['_app_id']) {
+				if ($app_id) {
+					update_post_meta($post_id, '_app_id', $app_id);
+					if ($app_data = $this->get_app_data($post_id)) {
+						// TODO: set post thumbnail to app icon
+					}
+				} else {
+					delete_post_meta($post_id, '_app_id');
+				}
+			}
 		}
+	}
+
+	function get_app_data($post_id)
+	{
+		if (!$post_id) return false;
+
+		$app_id = get_post_meta($post_id, '_app_id', true);
+		if (!$app_id) return false;
+
+		$trans_id = "ifavorites_app_data_$app_id";
+
+		if (!array_key_exists($app_id, $this->app_data)) {
+			if ($data = get_transient($trans_id)) {
+				$this->app_data[$app_id] = $data;
+			}
+		}
+
+		if (!array_key_exists($app_id, $this->app_data)) {
+			if (
+				$response = wp_remote_get("http://apx.apple.com/$app_id")
+				&& wp_remote_retrieve_response_code($response) == '200'
+				&& $json = wp_remote_retrieve_body($response)
+				&& $data = json_decode($json)
+			) {
+				$this->app_data[$app_id] = $data[0];
+				set_transient($trans_id, $this->app_data[$app_id]);
+			}
+		}
+
+		return $this->app_data[$app_id];
 	}
 }
