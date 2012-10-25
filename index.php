@@ -15,13 +15,15 @@ class iFavorites {
 	protected $slug = 'app';
 	protected $archive_slug = 'apps';
 
-	function __construct() {
+	function __construct()
+	{
 		add_action('init', array($this, 'register'));
 		add_action('admin_init', array($this, 'meta_boxes'));
 		add_action('save_post', array($this, 'save'));
 	}
 
-	function register() {
+	function register()
+	{
 		register_post_type($this->slug, array_merge(array(
 			'labels' => array(
 				'name' => _n("App", "Apps", 2, 'ifavorites'),
@@ -57,7 +59,8 @@ class iFavorites {
 		)));
 	}
 
-	function meta_boxes() {
+	function meta_boxes()
+	{
 		add_meta_box(
 			$this->slug."-options",
 			__("Options", 'ifavorites'),
@@ -67,7 +70,8 @@ class iFavorites {
 		);
 	}
 
-	function options($post) {
+	function options($post)
+	{
 		wp_nonce_field(plugin_basename(__FILE__), 'ifavorites_nonce');
 
 		$meta = get_post_custom($post->ID);
@@ -87,7 +91,8 @@ class iFavorites {
 		<?php
 	}
 
-	function save($post_id) {
+	function save($post_id)
+	{
 		if (!isset($_POST['ifavorites_nonce'])) return $post_id;
 		if (!wp_verify_nonce($_POST['ifavorites_nonce'], plugin_basename(__FILE__))) return $post_id;
 		if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return $post_id;
