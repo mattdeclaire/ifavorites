@@ -26,6 +26,23 @@ class iFavorites {
 
 	function register()
 	{
+		register_taxonomy('app-genre', $this->slug, array(
+			'labels' => array(
+				'name' => _n("App Genre", "App Genres", 2, 'ifavorites'),
+				'singular_name' => _n("App Genre", "App Genres", 1, 'ifavorites'),
+				'search_items' => __("Search App Genres", 'ifavorites'),
+				'all_items' => __('All App Genres'),
+				'parent_item' => __('Parent App Genre'),
+				'parent_item_colon' => __('Parent App Genre:'),
+				'edit_item' => __('Edit App Genre'), 
+				'update_item' => __('Update App Genre'),
+				'add_new_item' => __('Add New App Genre'),
+				'new_item_name' => __('New App Genre Name'),
+				'menu_name' => __('App Genres'),
+			),
+			'public' => true,
+		));
+
 		register_post_type($this->slug, array_merge(array(
 			'labels' => array(
 				'name' => _n("App", "Apps", 2, 'ifavorites'),
@@ -57,6 +74,9 @@ class iFavorites {
 			'rewrite' => array(
 				'slug' => $this->archive_slug,
 				'with_front' => false,
+			),
+			'taxonomies' => array(
+				'app-genre',
 			),
 		)));
 	}
@@ -118,6 +138,8 @@ class iFavorites {
 							'rating' => $app_meta->averageUserRatingForCurrentVersion,
 							'rating_count' => $app_meta->userRatingCount,
 						));
+
+						wp_set_post_terms($post_id, $app_meta->genres, 'app-genre');
 
 						if ($attachment_id = $this->import_photo(
 							$app_meta->artworkUrl512,
@@ -206,9 +228,10 @@ class iFavorites {
 			?>
 
 			<p class="meta">
+				<?=__("genres: ", 'ifavorites')?> <?=get_the_term_list($post->ID, 'app-genre', false, ', ')?><br>
 				price: <?=$meta['price'] ? '$'.number_format($meta['price']) : 'free'?><br>
 				<a href="<?=$meta['url']?>" target="_blank">app link</a><br>
-				rating: <?=$meta['rating']?> (<?=$meta['rating_count']?> ratings)
+				rating: <?=$meta['rating']?>
 			</p>
 
 			[gallery]
