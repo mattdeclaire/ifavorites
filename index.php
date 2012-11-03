@@ -21,6 +21,7 @@ class iFavorites {
 		add_action('init', array($this, 'register'));
 		add_action('admin_init', array($this, 'meta_boxes'));
 		add_action('save_post', array($this, 'save'));
+		add_filter('the_content', array($this, 'the_content_filter'));
 	}
 
 	function register()
@@ -193,5 +194,30 @@ class iFavorites {
 		wp_update_attachment_metadata($attach_id, $attach_data);
 
 		return $attach_id;
+	}
+
+	function the_content_filter($content)
+	{
+		global $post;
+
+		if ($post->post_type == $this->slug) {
+			$meta = get_post_meta($post->ID, '_app_meta', true);
+			ob_start();
+			?>
+
+			<p class="meta">
+				price: <?=$meta['price'] ? '$'.number_format($meta['price']) : 'free'?><br>
+				<a href="<?=$meta['url']?>" target="_blank">app link</a><br>
+				rating: <?=$meta['rating']?> (<?=$meta['rating_count']?> ratings)
+			</p>
+
+			[gallery]
+
+			<?php
+
+			$content .= ob_get_clean();
+		}
+
+		return $content;
 	}
 }
