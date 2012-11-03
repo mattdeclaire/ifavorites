@@ -75,10 +75,7 @@ class iFavorites {
 	{
 		wp_nonce_field(plugin_basename(__FILE__), 'ifavorites_nonce');
 
-		$meta = get_post_custom($post->ID);
-		extract(array(
-			'app_id' => $meta['_app_id'][0],
-		));
+		$app_id = get_post_meta($post->ID, '_app_id', true);
 
 		?>
 
@@ -94,50 +91,107 @@ class iFavorites {
 
 	function save($post_id)
 	{
-		if (!isset($_POST['ifavorites_nonce'])) return $post_id;
-		if (!wp_verify_nonce($_POST['ifavorites_nonce'], plugin_basename(__FILE__))) return $post_id;
+		if (wp_is_post_revision($post_id)) return $post_id;
+		if (!isset($_REQUEST['ifavorites_nonce'])) return $post_id;
+		if (!wp_verify_nonce($_REQUEST['ifavorites_nonce'], plugin_basename(__FILE__))) return $post_id;
 		if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return $post_id;
-		if ($_POST['post_type'] != $this->slug) return $post_id;
+		if ($_REQUEST['post_type'] != $this->slug) return $post_id;
 		if (!current_user_can('edit_post', $post_id)) return $post_id;
 
-		if ($form = $_POST['ifavorites']) {
+		if ($form = $_REQUEST['ifavorites']) {
 			$app_id = trim($form['app_id']);
-
-			$meta = get_post_custom($post_id);
-
-			if ($app_id != $meta['_app_id']) {
+			if ($app_id != get_post_meta($post_id, '_app_id', true)) {
 				if ($app_id) {
 					update_post_meta($post_id, '_app_id', $app_id);
-					if ($app_data = $this->get_app_meta($post_id)) {
-						// TODO: set post thumbnail to app icon
-						// TODO: save various pieces of data
-					}
+					if ($app_meta = $this->get_app_meta($app_id)) {
+						update_post_meta($post_id, '_app_meta', array(
+							'title' => $app_meta->trackName,
+							'author' => $app_meta->artistName,
+							'description' => $app_meta->description,
+							'price' => floatval($app_meta->price),
+							'version' => $app_meta->version,
+							'url' => $app_meta->trackViewUrl,
+							'vendor_url' => $app_meta->sellerUrl,
+							'release_date' => strtotime($app_meta->releaseDate),
+							'genres' => $app_meta->genres,
+							'rating' => $app_meta->averageUserRatingForCurrentVersion,
+							'rating_count' => $app_meta->userRatingCount,
+						));
+
+						if ($attachment_id = $this->import_photo(
+							$app_meta->artworkUrl512,
+							"$app_meta->trackName cpp icon",
+							$post_id,
+							"app-icon-$post_id-"
+						)) {
+							set_post_thumbnail($post_id, $attachment_id);
+						}
+
+						foreach ($app_meta->screenshotUrls as $ndx => $iphone_screenshot) {
+							$this->import_photo(
+								$iphone_screenshot,
+								"$app_meta->trackName iPhone screenshot ".($ndx+1),
+								$post_id,
+								"app-iphone-screenshot-$post_id-"
+							);
+						}
+
+						foreach ($app_meta->ipadScreenshotUrls as $ndx => $ipad_screenshot) {
+							$this->import_photo(
+								$ipad_screenshot,
+								"$app_meta->trackName iPad screenshot ".($ndx+1),
+								$post_id,
+								"app-ipad-screenshot-$post_id-"
+							);
+						}
+					} else die('could not retrieve data from apple');
 				} else {
 					delete_post_meta($post_id, '_app_id');
 				}
-			}
-		}
+			} // $app_id != 
+		} // if $form
 	}
 
-	function get_app_meta($post_id)
+	function get_app_meta($app_id)
 	{
-		$meta = get_post_meta($post_id, '_app_meta');
+		if (!($response = wp_remote_get("https://itunes.apple.com/lookup?id=$app_id"))) return false;
+		if (wp_remote_retrieve_response_code($response) != '200') return false;
+		if (!($json = wp_remote_retrieve_body($response))) return false;
+		if (!($data = json_decode($json))) return false;
+		if (!$data->resultCount) return false;
+		return $data->results[0];
+	}
 
-		if (
-			!$meta
-			&& $response = wp_remote_get("http://apx.apple.com/$app_id")
-			&& wp_remote_retrieve_response_code($response) == '200'
-			&& $json = wp_remote_retrieve_body($response)
-			&& $data = json_decode($json)
-		) {
-			$meta = array(
-				'title' => $data->title,
-				'icon' => $data->icon64,
-			);
+	function import_photo($url, $title, $post_id = 0, $prefix = '')
+	{
+		$attachment = wp_upload_bits($prefix.basename($url), null, '');
+		if ($attachment['error']) return false;
 
-			update_post_meta($post_id, '_app_meta', $meta);
-		}
+		$local = fopen($attachment['file'], 'w');
+		$remote = fopen($url, 'r');
 
-		return $meta;
+		if (!$local || !$remote) return false;
+
+		while (!feof($remote)) {
+ 			fwrite($local, fread($remote, 8192));
+ 		}
+
+		$filetype = wp_check_filetype($attachment['file'], null);
+
+		$attach_id = wp_insert_attachment(
+			array(
+				'post_mime_type' => $filetype['type'],
+				'post_title' => $title,
+				'post_content' => '',
+				'post_status' => 'inherit',
+			),
+			$attachment['file'],
+			$post_id
+		);
+
+		$attach_data = wp_generate_attachment_metadata($attach_id, $attachment['file']);
+		wp_update_attachment_metadata($attach_id, $attach_data);
+
+		return $attach_id;
 	}
 }
