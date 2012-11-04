@@ -118,71 +118,93 @@ class iFavorites {
 		if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return $post_id;
 		if ($_REQUEST['post_type'] != $this->slug) return $post_id;
 		if (!current_user_can('edit_post', $post_id)) return $post_id;
+		if (!isset($_REQUEST['ifavorites'])) return $post_id;
 
-		if ($form = $_REQUEST['ifavorites']) {
-			$app_id = trim($form['app_id']);
-			if ($app_id != get_post_meta($post_id, '_app_id', true)) {
-				if ($app_id) {
-					update_post_meta($post_id, '_app_id', $app_id);
-					if ($app_meta = $this->get_app_meta($app_id)) {
-						update_post_meta($post_id, '_app_meta', array(
-							'title' => $app_meta->trackName,
-							'author' => $app_meta->artistName,
-							'description' => $app_meta->description,
-							'price' => floatval($app_meta->price),
-							'version' => $app_meta->version,
-							'url' => $app_meta->trackViewUrl,
-							'vendor_url' => $app_meta->sellerUrl,
-							'release_date' => strtotime($app_meta->releaseDate),
-							'genres' => $app_meta->genres,
-							'rating' => $app_meta->averageUserRatingForCurrentVersion,
-							'rating_count' => $app_meta->userRatingCount,
-						));
+		$app_id = trim($_REQUEST['ifavorites']['app_id']);
 
-						wp_set_post_terms($post_id, $app_meta->genres, 'app-genre');
+		if ($app_id == get_post_meta($post_id, '_app_id', true)) die('save app id'); // return $post_id;
 
-						if ($attachment_id = $this->import_photo(
-							$app_meta->artworkUrl512,
-							"$app_meta->trackName cpp icon",
-							$post_id,
-							"app-icon-$post_id-"
-						)) {
-							set_post_thumbnail($post_id, $attachment_id);
-						}
+		if (!$app_id) {
+			delete_post_meta($post_id, '_app_id');
+			return $post_id;
+		}
 
-						foreach ($app_meta->screenshotUrls as $ndx => $iphone_screenshot) {
-							$this->import_photo(
-								$iphone_screenshot,
-								"$app_meta->trackName iPhone screenshot ".($ndx+1),
-								$post_id,
-								"app-iphone-screenshot-$post_id-"
-							);
-						}
+		$results = $this->app_search($app_id);
 
-						foreach ($app_meta->ipadScreenshotUrls as $ndx => $ipad_screenshot) {
-							$this->import_photo(
-								$ipad_screenshot,
-								"$app_meta->trackName iPad screenshot ".($ndx+1),
-								$post_id,
-								"app-ipad-screenshot-$post_id-"
-							);
-						}
-					} else die('could not retrieve data from apple');
-				} else {
-					delete_post_meta($post_id, '_app_id');
-				}
-			} // $app_id != 
-		} // if $form
+		if (!$results) {
+			if (!session_id()) session_start();
+			$_SESSION['ifavorites']['save_errors'][] = "Error while accessing iTunes store";
+			return false;
+		}
+
+		update_post_meta($post_id, '_app_id', $app_id);
+
+		$app_meta = $results[0];
+		$post = get_post($post_id);
+
+		update_post_meta($post_id, '_app_meta', array(
+			'title' => $app_meta->trackName,
+			'author' => $app_meta->artistName,
+			'description' => $app_meta->description,
+			'price' => floatval($app_meta->price),
+			'version' => $app_meta->version,
+			'url' => $app_meta->trackViewUrl,
+			'vendor_url' => $app_meta->sellerUrl,
+			'release_date' => strtotime($app_meta->releaseDate),
+			'genres' => $app_meta->genres,
+			'rating' => $app_meta->averageUserRatingForCurrentVersion,
+			'rating_count' => $app_meta->userRatingCount,
+		));
+
+		wp_set_post_terms($post_id, $app_meta->genres, 'app-genre');
+
+		if ($attachment_id = $this->import_photo(
+			$app_meta->artworkUrl512,
+			"$post->post_title app icon",
+			$post_id,
+			"app-icon-$post_id-"
+		)) {
+			set_post_thumbnail($post_id, $attachment_id);
+		}
+
+		foreach ($app_meta->screenshotUrls as $ndx => $iphone_screenshot) {
+			$this->import_photo(
+				$iphone_screenshot,
+				"$post->post_title iPhone screenshot ".($ndx+1),
+				$post_id,
+				"app-iphone-screenshot-$post_id-"
+			);
+		}
+
+		foreach ($app_meta->ipadScreenshotUrls as $ndx => $ipad_screenshot) {
+			$this->import_photo(
+				$ipad_screenshot,
+				"$post->post_title iPad screenshot ".($ndx+1),
+				$post_id,
+				"app-ipad-screenshot-$post_id-"
+			);
+		}
+
+		return $post_id;
 	}
 
-	function get_app_meta($app_id)
+	function app_search($search)
 	{
-		if (!($response = wp_remote_get("https://itunes.apple.com/lookup?id=$app_id"))) return false;
+		$params = wp_parse_args($params, array(
+		));
+
+		$url = "https://itunes.apple.com/lookup?".http_build_query(array(
+			'id' => $search,
+			'country' => 'us',
+			'media' => 'software',
+		));
+
+		if (!($response = wp_remote_get($url))) return false;
 		if (wp_remote_retrieve_response_code($response) != '200') return false;
 		if (!($json = wp_remote_retrieve_body($response))) return false;
 		if (!($data = json_decode($json))) return false;
-		if (!$data->resultCount) return false;
-		return $data->results[0];
+
+		return $data->results;
 	}
 
 	function import_photo($url, $title, $post_id = 0, $prefix = '')
