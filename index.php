@@ -22,11 +22,15 @@ class iFavorites {
 		add_action('admin_init', array($this, 'meta_boxes'));
 		add_action('save_post', array($this, 'save'));
 		add_filter('the_content', array($this, 'the_content_filter'));
+		add_filter("manage_edit-{$this->slug}_columns", array($this, 'columns'));
+		add_filter('manage_posts_custom_column', array($this, 'column'));
+		add_action('restrict_manage_posts', array($this, 'column_filter'));
+		add_filter('parse_query', array($this, 'column_filter_query'));
 	}
 
 	function register()
 	{
-		register_taxonomy('app-genre', $this->slug, array(
+		register_taxonomy('app_genre', $this->slug, array(
 			'labels' => array(
 				'name' => _n("App Genre", "App Genres", 2, 'ifavorites'),
 				'singular_name' => _n("App Genre", "App Genres", 1, 'ifavorites'),
@@ -41,6 +45,10 @@ class iFavorites {
 				'menu_name' => __('App Genres'),
 			),
 			'public' => true,
+			'rewrite' => array(
+				'slug' => 'app-genres',
+				'with_front' => false,
+			),
 		));
 
 		register_post_type($this->slug, array_merge(array(
@@ -75,9 +83,7 @@ class iFavorites {
 				'slug' => $this->archive_slug,
 				'with_front' => false,
 			),
-			'taxonomies' => array(
-				'app-genre',
-			),
+			'taxonomies' => array('app_genre'),
 		)));
 	}
 
@@ -85,7 +91,7 @@ class iFavorites {
 	{
 		add_meta_box(
 			$this->slug."-options",
-			__("Options", 'ifavorites'),
+			__("App Options", 'ifavorites'),
 			array($this, 'options'),
 			$this->slug,
 			'side'
@@ -156,7 +162,7 @@ class iFavorites {
 			'rating_count' => $app_meta->userRatingCount,
 		));
 
-		wp_set_post_terms($post_id, $app_meta->genres, 'app-genre');
+		wp_set_post_terms($post_id, $app_meta->genres, 'app_genre');
 
 		if ($attachment_id = $this->import_photo(
 			$app_meta->artworkUrl512,
@@ -250,7 +256,7 @@ class iFavorites {
 			?>
 
 			<p class="meta">
-				<?=__("genres: ", 'ifavorites')?> <?=get_the_term_list($post->ID, 'app-genre', false, ', ')?><br>
+				<?=__("genres: ", 'ifavorites')?> <?=get_the_term_list($post->ID, 'app_genre', false, ', ')?><br>
 				price: <?=$meta['price'] ? '$'.number_format($meta['price']) : 'free'?><br>
 				<a href="<?=$meta['url']?>" target="_blank">app link</a><br>
 				rating: <?=$meta['rating']?>
@@ -264,5 +270,45 @@ class iFavorites {
 		}
 
 		return $content;
+	}
+
+	function columns($columns)
+	{
+		$columns[$this->app.'_genres'] = __("Genres", 'ifavorites');
+		return $columns;
+	}
+
+	function column($column)
+	{
+		if ($this->app.'_genres') {
+			the_terms($post_id, 'app_genre', ' ');
+		}
+	}
+
+	function column_filter()
+	{
+		global $wp_query;
+		if (get_current_screen()->post_type == $this->slug) {
+			wp_dropdown_categories(array(
+				'show_option_all' => __("Show All App Genres", 'ifavorites'),
+				'taxonomy' => 'app_genre',
+				'name' => 'app_genre',
+				'orderby' => 'name',
+				'selected' => isset($wp_query->query['app_genre']) ? $wp_query->query['app_genre'] : '',
+				'hierarchical' => false,
+				'depth' => 3,
+				'show_count' => false,
+				'hide_empty' => true,
+			));
+		}
+	}
+
+	function column_filter_query($query)
+	{
+		$qv = &$query->query_vars;
+		if ($qv['app_genre'] && is_numeric($qv['app_genre'])) {
+			$term = get_term_by('id', $qv['app_genre'], 'app_genre');
+			$qv['app_genre'] = $term->slug;
+		}
 	}
 }
