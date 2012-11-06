@@ -26,6 +26,7 @@ class iFavorites {
 		add_filter('manage_posts_custom_column', array($this, 'column'));
 		add_action('restrict_manage_posts', array($this, 'column_filter'));
 		add_filter('parse_query', array($this, 'column_filter_query'));
+		add_action('widgets_init', array($this, 'register_widgets'));
 	}
 
 	function register()
@@ -310,5 +311,11 @@ class iFavorites {
 			$term = get_term_by('id', $qv['app_genre'], 'app_genre');
 			$qv['app_genre'] = $term->slug;
 		}
+	}
+
+	function register_widgets()
+	{
+		include dirname(__FILE__).'/widget-app-genres.php';
+		register_widget('iFavorites_App_Genre_Widget');
 	}
 }
