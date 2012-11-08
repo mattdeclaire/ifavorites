@@ -27,6 +27,7 @@ class iFavorites {
 		add_action('restrict_manage_posts', array($this, 'column_filter'));
 		add_filter('parse_query', array($this, 'column_filter_query'));
 		add_action('widgets_init', array($this, 'register_widgets'));
+		add_action('admin_head', array($this, 'admin_icons'));
 	}
 
 	function register()
@@ -315,5 +316,25 @@ class iFavorites {
 
 		include "$widget_dir/widget-recent-apps.php";
 		register_widget('iFavorites_Recent_Apps_Widget');
+	}
+
+	function admin_icons()
+	{
+		?>
+		<style type="text/css" media="screen">
+			#menu-posts-<?=$this->slug?> .wp-menu-image {
+				background: url(<?=plugins_url('icon.png', __FILE__)?>) no-repeat 6px 6px !important;
+			}
+			
+			#menu-posts-<?=$this->slug?>:hover .wp-menu-image,
+			#menu-posts-<?=$this->slug?>.wp-has-current-submenu .wp-menu-image {
+				background: url(<?=plugins_url('icon-on.png', __FILE__)?>) no-repeat 6px 6px !important;
+			}
+
+			#icon-edit.icon32-posts-<?=$this->slug?> {
+				background: url(<?=plugins_url('icon-32.png', __FILE__)?>) no-repeat;
+			}
+		</style>
+		<?php
 	}
 }
