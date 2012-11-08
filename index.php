@@ -219,14 +219,7 @@ class iFavorites {
 		$attachment = wp_upload_bits($prefix.basename($url), null, '');
 		if ($attachment['error']) return false;
 
-		$local = fopen($attachment['file'], 'w');
-		$remote = fopen($url, 'r');
-
-		if (!$local || !$remote) return false;
-
-		while (!feof($remote)) {
- 			fwrite($local, fread($remote, 8192));
- 		}
+		stream_copy_to_stream(fopen($url, 'r'), fopen($attachment['file'], 'w+'));
 
 		$filetype = wp_check_filetype($attachment['file'], null);
 
