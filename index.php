@@ -315,7 +315,12 @@ class iFavorites {
 
 	function register_widgets()
 	{
-		include dirname(__FILE__).'/widget-app-genres.php';
+		$widget_dir = dirname(__FILE__);
+		
+		include "$widget_dir/widget-app-genres.php";
 		register_widget('iFavorites_App_Genre_Widget');
+
+		include "$widget_dir/widget-recent-apps.php";
+		register_widget('iFavorites_Recent_Apps_Widget');
 	}
 }
