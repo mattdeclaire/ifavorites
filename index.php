@@ -115,6 +115,8 @@ class iFavorites {
 			</tr>
 		</table>
 
+		<p><?=__("After updating the App ID, saving the post will take extra time to download and process the app icon and screenshot images.")?></p>
+
 		<?php
 	}
 
