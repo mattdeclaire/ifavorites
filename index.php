@@ -130,7 +130,7 @@ class iFavorites {
 
 		$app_id = trim($_REQUEST['ifavorites']['app_id']);
 
-		if ($app_id == get_post_meta($post_id, '_app_id', true)) die('save app id'); // return $post_id;
+		if ($app_id == get_post_meta($post_id, '_app_id', true)) return $post_id;
 
 		if (!$app_id) {
 			delete_post_meta($post_id, '_app_id');
